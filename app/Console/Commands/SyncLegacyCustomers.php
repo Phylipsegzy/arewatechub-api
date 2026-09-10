@@ -69,14 +69,14 @@ class SyncLegacyCustomers extends Command
                 'city' => $row->city,
                 'gender' => $row->gender,
                 'address' => $row->address,
-                'dob' => $row->dob,
+                'dob' => $this->sanitizeDate($row->dob),
                 'education' => $row->education,
                 'password' => $row->password, // already bcrypt — works natively with Hash::check()
             ];
 
             if (! $existing) {
                 $attributes['wallet_balance'] = $row->wallet ?? 0;
-                $attributes['created_at'] = $row->created_at ?? now();
+                $attributes['created_at'] = $this->sanitizeDate($row->created_at) ?? now();
 
                 $this->line("+ New: {$row->email}");
                 $created++;
@@ -116,6 +116,26 @@ class SyncLegacyCustomers extends Command
             $this->error('Could not connect to the legacy database: ' . $e->getMessage());
             $this->line('Check LEGACY_DB_* values in your .env — see .env.example.additions.');
             return false;
+        }
+    }
+
+    /**
+     * The legacy DB has some rows with MySQL's old-style zero-dates
+     * ('0000-00-00', '0000-00-00 00:00:00') — valid under lenient SQL modes
+     * decades ago, rejected outright by any modern strict-mode connection
+     * (exactly the error that surfaced here). Treat anything that isn't a
+     * real, parseable date as simply "unknown" (null) instead.
+     */
+    protected function sanitizeDate(?string $value): ?string
+    {
+        if (! $value || str_starts_with($value, '0000-00-00')) {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->toDateTimeString();
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 }
