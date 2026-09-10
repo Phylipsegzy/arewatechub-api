@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WalletFundedMail;
 use App\Models\CustomerDedicatedAccount;
 use App\Models\WalletTransaction;
 use App\Services\PaystackService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class WalletController extends Controller
@@ -148,6 +150,8 @@ class WalletController extends Controller
             $customer->update(['wallet_balance' => $newBalance]);
         });
 
+        $this->sendFundedEmail($transaction->fresh());
+
         return response()->json([
             'message' => 'Wallet funded',
             'transaction' => $transaction->fresh(),
@@ -156,25 +160,35 @@ class WalletController extends Controller
     }
 
     /**
-     * Returns the customer's dedicated bank account if they already have one.
+     * Returns all of the customer's dedicated bank accounts — they can hold
+     * one per provider (Wema Bank and Paystack-Titan simultaneously, both
+     * crediting the same wallet).
      */
     public function dedicatedAccount(Request $request)
     {
-        $account = $request->user()->dedicatedAccount;
+        $accounts = $request->user()->dedicatedAccounts;
 
-        return response()->json($account);
+        return response()->json($accounts);
     }
 
     /**
      * Creates a permanent bank account number for this customer to transfer
-     * money into directly. Safe to call more than once — returns the existing
-     * account instead of creating a duplicate.
+     * money into directly, under the chosen provider. Safe to call more
+     * than once for the same provider — returns the existing account
+     * instead of creating a duplicate. Calling it again with the OTHER
+     * provider creates a second, separate account, both funding the same
+     * wallet.
      */
     public function createDedicatedAccount(Request $request, PaystackService $paystack)
     {
-        $customer = $request->user();
+        $request->validate([
+            'provider' => 'required|in:wema-bank,titan-paystack',
+        ]);
 
-        if ($existing = $customer->dedicatedAccount) {
+        $customer = $request->user();
+        $provider = $request->provider;
+
+        if ($existing = $customer->dedicatedAccounts()->where('provider', $provider)->first()) {
             return response()->json($existing);
         }
 
@@ -185,10 +199,11 @@ class WalletController extends Controller
             $customer->phone
         );
 
-        $dva = $paystack->createDedicatedAccount($paystackCustomer['customer_code']);
+        $dva = $paystack->createDedicatedAccount($paystackCustomer['customer_code'], $provider);
 
         $account = CustomerDedicatedAccount::create([
             'customer_id' => $customer->id,
+            'provider' => $provider,
             // Numeric id, not customer_code — matches what's already stored
             // for every legacy-imported account, and what Paystack sends
             // back in webhook payloads for matching incoming transfers.
@@ -201,5 +216,14 @@ class WalletController extends Controller
         ]);
 
         return response()->json($account, 201);
+    }
+
+    protected function sendFundedEmail(WalletTransaction $transaction): void
+    {
+        try {
+            Mail::to($transaction->customer->email)->send(new WalletFundedMail($transaction));
+        } catch (\Throwable $e) {
+            \Log::warning('Wallet-funded email failed to send: ' . $e->getMessage());
+        }
     }
 }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WalletFundedMail;
 use App\Models\CustomerDedicatedAccount;
 use App\Models\WalletTransaction;
 use App\Services\PaystackService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class PaystackWebhookController extends Controller
 {
@@ -55,7 +57,11 @@ class PaystackWebhookController extends Controller
 
         // Case 1: this reference matches a wallet funding we already created
         // a pending row for (popup flow). Credit it if not already done —
-        // idempotent, so a duplicate webhook delivery is harmless.
+        // idempotent, so a duplicate webhook delivery is harmless, and only
+        // ever emails once (the frontend's own /verify call checks the same
+        // "already successful" guard before it would send its own email, so
+        // whichever of the two actually performs the credit is the only one
+        // that notifies the customer).
         $transaction = WalletTransaction::where('reference', $reference)->first();
 
         if ($transaction) {
@@ -76,6 +82,7 @@ class PaystackWebhookController extends Controller
                 $customer->update(['wallet_balance' => $newBalance]);
             });
 
+            $this->sendFundedEmail($transaction->fresh());
             return;
         }
 
@@ -99,18 +106,17 @@ class PaystackWebhookController extends Controller
 
         $amountNaira = ($data['amount'] ?? 0) / 100;
 
-        DB::transaction(function () use ($dedicatedAccount, $reference, $amountNaira) {
-            // firstOrCreate on the unique reference makes this safe against
-            // Paystack's automatic webhook retries.
-            $existing = WalletTransaction::where('reference', $reference)->exists();
-            if ($existing) {
-                return;
+        $createdTransaction = DB::transaction(function () use ($dedicatedAccount, $reference, $amountNaira) {
+            // Guards against Paystack's automatic webhook retries creating
+            // a duplicate credit for the same transfer.
+            if (WalletTransaction::where('reference', $reference)->exists()) {
+                return null;
             }
 
             $customer = $dedicatedAccount->customer()->lockForUpdate()->first();
             $newBalance = $customer->wallet_balance + $amountNaira;
 
-            WalletTransaction::create([
+            $transaction = WalletTransaction::create([
                 'customer_id' => $customer->id,
                 'type' => 'credit',
                 'amount' => $amountNaira,
@@ -123,6 +129,21 @@ class PaystackWebhookController extends Controller
             ]);
 
             $customer->update(['wallet_balance' => $newBalance]);
+
+            return $transaction;
         });
+
+        if ($createdTransaction) {
+            $this->sendFundedEmail($createdTransaction->fresh());
+        }
+    }
+
+    protected function sendFundedEmail(WalletTransaction $transaction): void
+    {
+        try {
+            Mail::to($transaction->customer->email)->send(new WalletFundedMail($transaction));
+        } catch (\Throwable $e) {
+            Log::warning('Wallet-funded email failed to send: ' . $e->getMessage());
+        }
     }
 }

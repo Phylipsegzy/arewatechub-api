@@ -29,9 +29,9 @@ class Customer extends Authenticatable
         return $this->hasMany(WalletTransaction::class);
     }
 
-    public function dedicatedAccount()
+    public function dedicatedAccounts()
     {
-        return $this->hasOne(CustomerDedicatedAccount::class);
+        return $this->hasMany(CustomerDedicatedAccount::class);
     }
 
     public function orders()
