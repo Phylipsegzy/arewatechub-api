@@ -15,3 +15,8 @@ Artisan::command('inspire', function () {
 // minute — see the README for the exact command. Until that's set up, you
 // can trigger it manually any time with: php artisan surveys:send
 Schedule::command('surveys:send')->dailyAt('20:00');
+
+// Uncomment once you've tested `php artisan legacy:sync-customers` manually
+// and are happy with what it does — keeps picking up new signups from the
+// old site automatically while both are live during the transition.
+// Schedule::command('legacy:sync-customers')->hourly();

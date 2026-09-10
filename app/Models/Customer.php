@@ -13,7 +13,7 @@ class Customer extends Authenticatable
     protected $fillable = [
         'firstname', 'lastname', 'middlename', 'email', 'phone',
         'password', 'state', 'city', 'gender', 'address', 'dob', 'education',
-        'wallet_balance',
+        'wallet_balance', 'nin', 'picture_url',
     ];
 
     protected $hidden = ['password', 'remember_token'];

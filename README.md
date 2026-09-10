@@ -462,6 +462,48 @@ balance plus the net of every `successful` transaction on their account, and
 corrects the column to match — nothing is guessed, it's derived entirely
 from your real transaction history. Safe to run more than once.
 
+## New: live legacy database sync
+
+Since both sites are on the same server (same MySQL host, different
+database), the legacy site's customer data can be synced directly — no
+static SQL dump needed, and safe to re-run as many times as you want while
+both sites are live during the transition.
+
+**Setup:**
+1. Add the `legacy` connection to your **existing** `config/database.php`
+   (don't overwrite the file — see `config/database-legacy-snippet.php` for
+   exactly what to paste into the `'connections' => [...]` array)
+2. Add the `LEGACY_DB_*` values to `.env` (see `.env.example.additions`) —
+   fill in your actual DB username/password from hPanel's MySQL Databases page
+3. Test the connection and preview what it would do, without changing anything:
+   ```bash
+   php artisan legacy:sync-customers --dry-run
+   ```
+4. Once that looks right, actually run it:
+   ```bash
+   php artisan legacy:sync-customers
+   ```
+
+**What it does:** matches by email — creates any legacy customer that
+doesn't exist here yet, and updates the profile fields (name, phone,
+address, etc.) on ones that already do. Password hashes are copied as-is
+(the legacy site's bcrypt hashes work natively with `Hash::check()`, so
+customers log in with their existing password immediately).
+
+**Wallet balances are NOT overwritten by default** — once a customer starts
+using the new app, their balance here is the source of truth, not the old
+site. Pass `--sync-wallet` only if you specifically want the legacy
+balance to win (useful for the very first import, before anyone's used
+the new app yet — don't use it after that).
+
+**Found while building this:** `nin` and `picture_url` were missing from
+`Customer::$fillable` — the exact same silent-failure bug as the
+`wallet_balance` issue from before. Fixed alongside this.
+
+A commented-out hourly schedule entry is in `routes/console.php` if you
+want new legacy signups to flow in automatically — test manually first
+before uncommenting it.
+
 ## Not yet built (next)
 
 - Paystack webhook endpoint (currently relies on the frontend calling `/verify` after redirect).
