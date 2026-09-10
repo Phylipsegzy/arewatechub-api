@@ -33,15 +33,9 @@ jobs:
           TARGET: ${{ secrets.DEPLOY_PATH }}
           # Never touch .env, uploaded receipts, logs, or Laravel's runtime
           # cache folders on the server — only code gets overwritten.
-          EXCLUDE: |
-            .env
-            .git/
-            .github/
-            storage/app/public/
-            storage/logs/
-            storage/framework/cache/
-            storage/framework/sessions/
-            storage/framework/views/
+          # Single comma-separated line — this action mishandles multi-line
+          # YAML blocks here (each line ends up run as its own shell command).
+          EXCLUDE: ".env, .git/, .github/, storage/app/public/, storage/logs/, storage/framework/cache/, storage/framework/sessions/, storage/framework/views/"
           ARGS: -avzr --delete
 
       - name: Run post-deploy Artisan commands
