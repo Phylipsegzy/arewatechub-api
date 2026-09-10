@@ -1,0 +1,59 @@
+name: Deploy to Hostinger
+
+# Runs on every push to main. Composer runs HERE, in GitHub's environment
+# (no proc_open restriction), never on Hostinger — that's the whole fix.
+# Only the finished, ready-to-run files (including vendor/) get sent over.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Deploy files to Hostinger via rsync
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_PORT: ${{ secrets.SSH_PORT }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          TARGET: ${{ secrets.DEPLOY_PATH }}
+          # Never touch .env, uploaded receipts, logs, or Laravel's runtime
+          # cache folders on the server — only code gets overwritten.
+          EXCLUDE: |
+            .env
+            .git/
+            .github/
+            storage/app/public/
+            storage/logs/
+            storage/framework/cache/
+            storage/framework/sessions/
+            storage/framework/views/
+          ARGS: -avzr --delete
+
+      - name: Run post-deploy Artisan commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan storage:link || true
