@@ -81,18 +81,19 @@ class PaystackWebhookController extends Controller
 
         // Case 2: no matching row — this is a direct transfer into a
         // customer's dedicated virtual account, which happens outside any
-        // flow we initiated. Identify the customer via the Paystack
-        // customer_code stored when their dedicated account was created,
-        // and create the wallet_transactions row here for the first time.
-        $customerCode = $data['customer']['customer_code'] ?? null;
-        if (! $customerCode) {
-            Log::warning('Paystack webhook: charge.success with no matching reference and no customer_code', ['reference' => $reference]);
+        // flow we initiated. Identify the customer via Paystack's numeric
+        // customer id (NOT customer_code — the same customer has both, but
+        // this app stores and matches on the plain numeric id throughout,
+        // matching what's actually in customer_dedicated_accounts).
+        $paystackNumericId = $data['customer']['id'] ?? null;
+        if (! $paystackNumericId) {
+            Log::warning('Paystack webhook: charge.success with no matching reference and no customer id', ['reference' => $reference]);
             return;
         }
 
-        $dedicatedAccount = CustomerDedicatedAccount::where('paystack_customer_id', $customerCode)->first();
+        $dedicatedAccount = CustomerDedicatedAccount::where('paystack_customer_id', $paystackNumericId)->first();
         if (! $dedicatedAccount) {
-            Log::warning('Paystack webhook: charge.success for unknown dedicated account customer', ['customer_code' => $customerCode]);
+            Log::warning('Paystack webhook: charge.success for unknown dedicated account customer', ['paystack_customer_id' => $paystackNumericId]);
             return;
         }
 

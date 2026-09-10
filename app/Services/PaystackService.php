@@ -126,4 +126,22 @@ class PaystackService
 
         return $response->json('data');
     }
+
+    /**
+     * Fetches a customer's real record from Paystack by email — used to
+     * correct dedicated account rows that were imported with the wrong
+     * identifier (Paystack's internal numeric customer id instead of the
+     * public customer_code, e.g. "CUS_xxxxx", which is what webhooks
+     * actually send).
+     */
+    public function getCustomerByEmail(string $email): array
+    {
+        $response = Http::withToken($this->secretKey)->get("{$this->baseUrl}/customer/" . urlencode($email));
+
+        if (! $response->successful()) {
+            throw new RuntimeException("Paystack customer lookup failed for {$email}: " . $response->body());
+        }
+
+        return $response->json('data');
+    }
 }

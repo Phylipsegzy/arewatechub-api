@@ -189,7 +189,10 @@ class WalletController extends Controller
 
         $account = CustomerDedicatedAccount::create([
             'customer_id' => $customer->id,
-            'paystack_customer_id' => $paystackCustomer['customer_code'],
+            // Numeric id, not customer_code — matches what's already stored
+            // for every legacy-imported account, and what Paystack sends
+            // back in webhook payloads for matching incoming transfers.
+            'paystack_customer_id' => $paystackCustomer['id'],
             'bank_name' => $dva['bank']['name'] ?? null,
             'account_name' => $dva['account_name'] ?? null,
             'account_number' => $dva['account_number'] ?? null,
