@@ -9,8 +9,9 @@ use Carbon\Carbon;
 
 /**
  * Computes the actual start/end datetime for a booking, given the plan,
- * duration, the SESSION the customer picked (9am-3pm, 3:30pm-9pm, or the
- * overnight 10pm-7am), and the start date.
+ * duration, the SESSION the customer picked (currently just one: 8am-6pm,
+ * though this still supports multiple/overnight sessions if that ever
+ * changes again), and the start date.
  *
  * A plan can still carry a `promo_fixed_end_date` (e.g. the September 2-in-1
  * Promo) that overrides whatever the duration would normally compute, so
