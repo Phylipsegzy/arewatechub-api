@@ -355,6 +355,15 @@ class AdminBookingController extends Controller
         return response()->json($feedback);
     }
 
+    public function teenProgramRegistrations()
+    {
+        $registrations = \App\Models\TeenProgramRegistration::with('customer:id,firstname,lastname,email,phone')
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($registrations);
+    }
+
     public function overview()
     {
         $today = now()->toDateString();
@@ -369,6 +378,8 @@ class AdminBookingController extends Controller
                 ->whereDate('created_at', $today)
                 ->sum('amount'),
             'pending_wallet_fundings' => WalletTransaction::where('source', 'bank_transfer')->where('status', 'pending')->count(),
+            'teen_program_slots_taken' => \App\Models\TeenProgramRegistration::count(),
+            'teen_program_slots_total' => \App\Http\Controllers\Api\TeenProgramController::TOTAL_SLOTS,
             'recent_activity' => WalletTransaction::with('customer:id,firstname,lastname')
                 ->latest()
                 ->limit(10)
