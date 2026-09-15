@@ -39,6 +39,11 @@ class Customer extends Authenticatable
         return $this->hasMany(TeenProgramRegistration::class);
     }
 
+    public function cohortEnrollments()
+    {
+        return $this->hasMany(CohortEnrollment::class);
+    }
+
     public function orders()
     {
         return $this->hasMany(Order::class);

@@ -232,6 +232,74 @@ class TeenProgramController extends Controller
         return response()->json($registration->load('customer'));
     }
 
+    /**
+     * Real, downloadable PDF — same design as the procedural site's
+     * Dompdf-generated receipt, ported line for line.
+     */
+    public function receiptPdf(Request $request, TeenProgramRegistration $registration, \App\Services\PdfService $pdf)
+    {
+        if ($registration->customer_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not your registration'], 403);
+        }
+        if ($registration->registration_payment_status !== 'paid') {
+            return response()->json(['message' => 'This registration has not been paid for yet.'], 422);
+        }
+
+        $registration->load(['customer', 'payments']);
+        $payments = $registration->payments()->orderBy('created_at')->get();
+
+        if ($payments->isEmpty()) {
+            return response()->json(['message' => 'No payments found for this registration.'], 422);
+        }
+
+        $childName = trim("{$registration->child_firstname} {$registration->child_lastname}");
+        $receiptNo = 'RCP-FBC-' . str_pad((string) $registration->id, 5, '0', STR_PAD_LEFT);
+
+        return $pdf->render('pdf.teen-receipt', [
+            'registration' => $registration,
+            'payments' => $payments,
+            'childName' => $childName,
+            'parentName' => trim("{$registration->customer->firstname} {$registration->customer->lastname}"),
+            'email' => $registration->customer->email,
+            'receiptNo' => $receiptNo,
+            'latestDate' => $payments->last()->created_at->format('F j, Y g:i A'),
+            'totalPaid' => $payments->sum('amount'),
+            'isVip' => $payments->contains('payment_type', 'vip'),
+            'logoSrc' => $pdf->logoDataUri(),
+        ], "ArewaTecHub_Receipt_{$receiptNo}.pdf");
+    }
+
+    /**
+     * Real, downloadable PDF — same design as the procedural site's
+     * Dompdf-generated admission letter, ported line for line.
+     */
+    public function admissionLetterPdf(Request $request, TeenProgramRegistration $registration, \App\Services\PdfService $pdf)
+    {
+        if ($registration->customer_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not your registration'], 403);
+        }
+        if ($registration->registration_payment_status !== 'paid') {
+            return response()->json(['message' => 'The registration fee must be paid before the admission letter can be downloaded.'], 422);
+        }
+
+        $registration->load('customer');
+        $childName = trim("{$registration->child_firstname} {$registration->child_lastname}");
+        $isVip = $registration->vip_payment_status === 'paid';
+        $amount = (float) $registration->registration_amount + ($isVip ? (float) $registration->vip_amount : 0);
+
+        return $pdf->render('pdf.teen-admission-letter', [
+            'registration' => $registration,
+            'childName' => $childName,
+            'parentName' => trim($registration->parent_name ?: "{$registration->customer->firstname} {$registration->customer->lastname}"),
+            'isVip' => $isVip,
+            'category' => $isVip ? 'VIP' : 'STANDARD',
+            'amount' => $amount,
+            'admissionNo' => 'FBC-' . str_pad((string) $registration->id, 5, '0', STR_PAD_LEFT),
+            'issuedDate' => now()->format('F j, Y'),
+            'logoSrc' => $pdf->logoDataUri(),
+        ], "ArewaTecHub_Admission_Letter_" . preg_replace('/[^A-Za-z0-9\-]/', '_', $childName) . ".pdf");
+    }
+
     protected function sendRegisteredEmails(TeenProgramRegistration $registration): void
     {
         try {

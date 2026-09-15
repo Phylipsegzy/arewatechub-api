@@ -364,6 +364,15 @@ class AdminBookingController extends Controller
         return response()->json($registrations);
     }
 
+    public function cohortEnrollments()
+    {
+        $enrollments = \App\Models\CohortEnrollment::with(['customer:id,firstname,lastname,email,phone', 'intake:id,name'])
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($enrollments);
+    }
+
     public function overview()
     {
         $today = now()->toDateString();

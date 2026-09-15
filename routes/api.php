@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PaystackWebhookController;
 use App\Http\Controllers\Api\TeenProgramController;
+use App\Http\Controllers\Api\CohortController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,7 @@ Route::get('/workspace/plans/{plan}/sessions', [WorkspaceController::class, 'ses
 Route::get('/workspace/plans/{plan}/durations', [WorkspaceController::class, 'durations']);
 Route::get('/workspace/availability', [WorkspaceController::class, 'availability']);
 Route::get('/teen-program/slots-remaining', [TeenProgramController::class, 'slotsRemaining']);
+Route::get('/cohort', [CohortController::class, 'index']);
 
 // --- Authenticated (Sanctum) ---
 Route::middleware('auth:sanctum')->group(function () {
@@ -58,7 +60,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/teen-program', [TeenProgramController::class, 'store']);
     Route::post('/teen-program/{registration}/pay', [TeenProgramController::class, 'pay']);
     Route::get('/teen-program/{registration}/receipt', [TeenProgramController::class, 'receipt']);
+    Route::get('/teen-program/{registration}/receipt/pdf', [TeenProgramController::class, 'receiptPdf']);
     Route::get('/teen-program/{registration}/admission-letter', [TeenProgramController::class, 'admissionLetter']);
+    Route::get('/teen-program/{registration}/admission-letter/pdf', [TeenProgramController::class, 'admissionLetterPdf']);
+
+    Route::get('/cohort/my-enrollment', [CohortController::class, 'myEnrollment']);
+    Route::post('/cohort/enroll', [CohortController::class, 'enroll']);
+    Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
+    Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
+    Route::get('/cohort/{enrollment}/receipt/pdf', [CohortController::class, 'receiptPdf']);
 });
 
 // --- Admin ---
@@ -93,6 +103,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     Route::get('/feedback', [AdminBookingController::class, 'feedback']);
     Route::get('/teen-program', [AdminBookingController::class, 'teenProgramRegistrations']);
+    Route::get('/cohort', [AdminBookingController::class, 'cohortEnrollments']);
 
     Route::get('/push/vapid-public-key', [AdminPushController::class, 'vapidPublicKey']);
     Route::post('/push/subscribe', [AdminPushController::class, 'subscribe']);
