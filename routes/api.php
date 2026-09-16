@@ -20,6 +20,20 @@ use Illuminate\Support\Facades\Route;
 // Laravel server/DB, not the frontend or login logic.
 Route::get('/health', fn () => response()->json(['ok' => true, 'time' => now()]));
 
+// One-time diagnostic/fix route — resets PHP's OPcache on the actual web
+// (PHP-FPM) process, which `php artisan optimize:clear` over SSH/CLI does
+// NOT touch (CLI and FPM are separate PHP processes with separate OPcache
+// memory on most shared hosting, including this one). Remove this route
+// once confirmed fixed — it's not something that should stay reachable
+// long-term, even though it only resets a cache and touches no data.
+Route::get('/__reset-opcache', function () {
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+        return response()->json(['message' => 'OPcache reset.']);
+    }
+    return response()->json(['message' => 'OPcache is not enabled on this server — nothing to reset.']);
+});
+
 // --- Public ---
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
