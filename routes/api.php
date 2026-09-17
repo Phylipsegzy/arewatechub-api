@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // clearing. The PreventCaching middleware still prevents this from
     // ever happening again on this (or any) endpoint going forward.
     Route::get('/cohort/enrollment-status', [CohortController::class, 'myEnrollment']);
+    Route::get('/cohort/enrollment-status-real', [CohortController::class, 'myEnrollmentReal']);
     Route::post('/cohort/enroll', [CohortController::class, 'enroll']);
     Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
     Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
