@@ -81,21 +81,6 @@ class CohortController extends Controller
         ]);
     }
 
-    public function myEnrollment(Request $request)
-    {
-        // TEMPORARY — proves definitively whether editing THIS method,
-        // through the NORMAL deploy pipeline, changes what this route
-        // actually serves. Remove once confirmed.
-        return response()->json(['UNMISTAKABLE_MARKER' => 'HELLO-WORLD-TEST-99887766']);
-    }
-
-    public function myEnrollmentReal(Request $request)
-    {
-        $enrollment = $request->user()->cohortEnrollments()->with('intake')->latest()->first();
-
-        return response()->json($enrollment);
-    }
-
     public function enroll(Request $request)
     {
         $request->validate([
