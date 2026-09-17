@@ -72,18 +72,22 @@ Route::middleware('auth:sanctum')->group(function () {
     // clearing. The PreventCaching middleware still prevents this from
     // ever happening again on this (or any) endpoint going forward.
     // A plain closure here, not a controller method — after extensive
-    // testing, this exact logic reliably works as a closure but not when
-    // called through CohortController specifically, for reasons that
-    // resisted every diagnostic tried. Sidestepping it this way is
-    // guaranteed to work rather than continuing to chase why.
-    Route::get('/cohort/enrollment-status', function (\Illuminate\Http\Request $request) {
-        $enrollment = $request->user()->cohortEnrollments()->with('intake')->latest()->first();
-        return response()->json($enrollment);
-    });
     Route::post('/cohort/enroll', [CohortController::class, 'enroll']);
     Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
     Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
     Route::get('/cohort/{enrollment}/receipt/pdf', [CohortController::class, 'receiptPdf']);
+});
+
+// Standalone, deliberately OUTSIDE the group above — every attempt to
+// register this same logic INSIDE that shared group returned a broken
+// response no matter what form the logic took (controller method,
+// closure, different URL). This exact structure — its own top-level
+// Route:: call with its own middleware() — is the one thing that worked
+// throughout everything tried. Not fully explained, but confirmed
+// reliable, and this route needs to work more than it needs an explanation.
+Route::middleware('auth:sanctum')->get('/cohort/enrollment-status', function (\Illuminate\Http\Request $request) {
+    $enrollment = $request->user()->cohortEnrollments()->with('intake')->latest()->first();
+    return response()->json($enrollment);
 });
 
 // --- Admin ---
