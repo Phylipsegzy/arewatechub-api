@@ -20,20 +20,6 @@ use Illuminate\Support\Facades\Route;
 // Laravel server/DB, not the frontend or login logic.
 Route::get('/health', fn () => response()->json(['ok' => true, 'time' => now()]));
 
-// One-time diagnostic/fix route — resets PHP's OPcache on the actual web
-// (PHP-FPM) process, which `php artisan optimize:clear` over SSH/CLI does
-// NOT touch (CLI and FPM are separate PHP processes with separate OPcache
-// memory on most shared hosting, including this one). Remove this route
-// once confirmed fixed — it's not something that should stay reachable
-// long-term, even though it only resets a cache and touches no data.
-Route::get('/__reset-opcache', function () {
-    if (function_exists('opcache_reset')) {
-        opcache_reset();
-        return response()->json(['message' => 'OPcache reset.']);
-    }
-    return response()->json(['message' => 'OPcache is not enabled on this server — nothing to reset.']);
-});
-
 // --- Public ---
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -78,7 +64,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/teen-program/{registration}/admission-letter', [TeenProgramController::class, 'admissionLetter']);
     Route::get('/teen-program/{registration}/admission-letter/pdf', [TeenProgramController::class, 'admissionLetterPdf']);
 
-    Route::get('/cohort/my-enrollment', [CohortController::class, 'myEnrollment']);
+    // Renamed from /cohort/my-enrollment — that exact URL had a cached
+    // response frozen from early testing, apparently poisoned at a caching
+    // layer (LiteSpeed/CDN) that ignores Cache-Control on already-cached
+    // entries. Confirmed via a brand-new debug URL executing correctly
+    // with identical logic — a fresh path was the fix, not more cache
+    // clearing. The PreventCaching middleware still prevents this from
+    // ever happening again on this (or any) endpoint going forward.
+    Route::get('/cohort/enrollment-status', [CohortController::class, 'myEnrollment']);
     Route::post('/cohort/enroll', [CohortController::class, 'enroll']);
     Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
     Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
