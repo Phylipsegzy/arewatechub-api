@@ -81,6 +81,13 @@ class CohortController extends Controller
         ]);
     }
 
+    public function myEnrollment(Request $request)
+    {
+        $enrollment = $request->user()->cohortEnrollments()->with('intake')->latest()->first();
+
+        return response()->json($enrollment);
+    }
+
     public function enroll(Request $request)
     {
         $request->validate([

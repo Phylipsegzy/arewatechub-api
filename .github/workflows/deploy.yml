@@ -49,5 +49,5 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             php artisan migrate --force
             php artisan config:cache
-            php artisan route:cache
+            php artisan route:clear
             php artisan storage:link || true

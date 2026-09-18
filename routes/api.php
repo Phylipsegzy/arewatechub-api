@@ -76,18 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
     Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
     Route::get('/cohort/{enrollment}/receipt/pdf', [CohortController::class, 'receiptPdf']);
-});
-
-// Standalone, deliberately OUTSIDE the group above — every attempt to
-// register this same logic INSIDE that shared group returned a broken
-// response no matter what form the logic took (controller method,
-// closure, different URL). This exact structure — its own top-level
-// Route:: call with its own middleware() — is the one thing that worked
-// throughout everything tried. Not fully explained, but confirmed
-// reliable, and this route needs to work more than it needs an explanation.
-Route::middleware('auth:sanctum')->get('/cohort/enrollment-status', function (\Illuminate\Http\Request $request) {
-    $enrollment = $request->user()->cohortEnrollments()->with('intake')->latest()->first();
-    return response()->json($enrollment);
+    Route::get('/cohort/enrollment-status', [CohortController::class, 'myEnrollment']);
 });
 
 // --- Admin ---
