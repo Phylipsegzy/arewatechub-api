@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PaystackWebhookController;
 use App\Http\Controllers\Api\TeenProgramController;
-use App\Http\Controllers\Api\CohortController;
+use App\Http\Controllers\Api\AcademyEnrollmentController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -33,7 +33,7 @@ Route::get('/workspace/plans/{plan}/sessions', [WorkspaceController::class, 'ses
 Route::get('/workspace/plans/{plan}/durations', [WorkspaceController::class, 'durations']);
 Route::get('/workspace/availability', [WorkspaceController::class, 'availability']);
 Route::get('/teen-program/slots-remaining', [TeenProgramController::class, 'slotsRemaining']);
-Route::get('/cohort', [CohortController::class, 'index']);
+Route::get('/academy/options', [AcademyEnrollmentController::class, 'options']);
 
 // --- Authenticated (Sanctum) ---
 Route::middleware('auth:sanctum')->group(function () {
@@ -64,19 +64,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/teen-program/{registration}/admission-letter', [TeenProgramController::class, 'admissionLetter']);
     Route::get('/teen-program/{registration}/admission-letter/pdf', [TeenProgramController::class, 'admissionLetterPdf']);
 
-    // Renamed from /cohort/my-enrollment — that exact URL had a cached
-    // response frozen from early testing, apparently poisoned at a caching
-    // layer (LiteSpeed/CDN) that ignores Cache-Control on already-cached
-    // entries. Confirmed via a brand-new debug URL executing correctly
-    // with identical logic — a fresh path was the fix, not more cache
-    // clearing. The PreventCaching middleware still prevents this from
-    // ever happening again on this (or any) endpoint going forward.
-    // A plain closure here, not a controller method — after extensive
-    Route::post('/cohort/enroll', [CohortController::class, 'enroll']);
-    Route::post('/cohort/{enrollment}/pay', [CohortController::class, 'pay']);
-    Route::get('/cohort/{enrollment}/receipt', [CohortController::class, 'receipt']);
-    Route::get('/cohort/{enrollment}/receipt/pdf', [CohortController::class, 'receiptPdf']);
-    Route::get('/cohort/enrollment-status', [CohortController::class, 'myEnrollment']);
+    // Rebuilt entirely fresh under /academy/* — the old /cohort/* endpoint
+    // stayed inexplicably broken through days of diagnosis even after the
+    // route:cache issue was found and fixed. New table, new model, new
+    // controller, new route paths — no possible overlap with whatever was
+    // stuck before.
+    Route::post('/academy/enroll', [AcademyEnrollmentController::class, 'enroll']);
+    Route::post('/academy/{enrollment}/pay', [AcademyEnrollmentController::class, 'pay']);
+    Route::get('/academy/{enrollment}/receipt', [AcademyEnrollmentController::class, 'receipt']);
+    Route::get('/academy/{enrollment}/receipt/pdf', [AcademyEnrollmentController::class, 'receiptPdf']);
+    Route::get('/academy/status', [AcademyEnrollmentController::class, 'status']);
 });
 
 // --- Admin ---
@@ -111,7 +108,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     Route::get('/feedback', [AdminBookingController::class, 'feedback']);
     Route::get('/teen-program', [AdminBookingController::class, 'teenProgramRegistrations']);
-    Route::get('/cohort', [AdminBookingController::class, 'cohortEnrollments']);
+    Route::get('/academy', [AdminBookingController::class, 'academyEnrollments']);
+    Route::get('/academy/{enrollment}/receipt/pdf', [AdminBookingController::class, 'academyReceiptPdf']);
 
     Route::get('/push/vapid-public-key', [AdminPushController::class, 'vapidPublicKey']);
     Route::post('/push/subscribe', [AdminPushController::class, 'subscribe']);

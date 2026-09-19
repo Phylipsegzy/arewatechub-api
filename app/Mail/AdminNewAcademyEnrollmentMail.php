@@ -7,10 +7,10 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class CohortFeePaidMail extends Mailable
+class AdminNewAcademyEnrollmentMail extends Mailable
 {
     use Queueable, SerializesModels;
     public function __construct(public AcademyEnrollment $enrollment) {}
-    public function envelope(): Envelope { return new Envelope(subject: 'Digital Academy Cohort — Payment Confirmed'); }
-    public function content(): Content { return new Content(view: 'emails.cohort-fee-paid'); }
+    public function envelope(): Envelope { return new Envelope(subject: 'New Cohort Programme Enrollment'); }
+    public function content(): Content { return new Content(view: 'emails.admin-new-cohort-enrollment'); }
 }

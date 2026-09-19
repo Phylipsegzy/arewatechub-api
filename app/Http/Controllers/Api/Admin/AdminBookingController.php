@@ -364,13 +364,23 @@ class AdminBookingController extends Controller
         return response()->json($registrations);
     }
 
-    public function cohortEnrollments()
+    public function academyEnrollments()
     {
-        $enrollments = \App\Models\CohortEnrollment::with(['customer:id,firstname,lastname,email,phone', 'intake:id,name'])
+        $enrollments = \App\Models\AcademyEnrollment::with(['customer:id,firstname,lastname,email,phone', 'batch:id,name'])
             ->latest()
             ->paginate(30);
 
         return response()->json($enrollments);
+    }
+
+    /**
+     * Lets admin download/print any customer's receipt directly — doesn't
+     * require the customer to be logged in or to have downloaded it
+     * themselves. Reuses the exact same PDF as the customer's own download.
+     */
+    public function academyReceiptPdf(\App\Models\AcademyEnrollment $enrollment, \App\Services\PdfService $pdf)
+    {
+        return app(\App\Http\Controllers\Api\AcademyEnrollmentController::class)->buildReceiptPdf($enrollment, $pdf);
     }
 
     public function overview()
