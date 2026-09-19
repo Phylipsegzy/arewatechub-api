@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::dropIfExists('cohort_enrollments');
-        Schema::dropIfExists('cohort_sessions');
+        // Correct dependency order — children before parents:
+        // cohort_attendance -> cohort_sessions -> cohort_enrollments -> cohort_intakes -> cohort_programs
         Schema::dropIfExists('cohort_attendance');
+        Schema::dropIfExists('cohort_sessions');
+        Schema::dropIfExists('cohort_enrollments');
         Schema::dropIfExists('cohort_intakes');
         Schema::dropIfExists('cohort_programs');
 

@@ -504,6 +504,184 @@ A commented-out hourly schedule entry is in `routes/console.php` if you
 want new legacy signups to flow in automatically — test manually first
 before uncommenting it.
 
+## September 2026 pricing/structure overhaul
+
+All six changes below are baked into `WorkspaceSeeder.php`, which is
+idempotent — **just re-run it on production**, it safely updates existing
+rows rather than duplicating them:
+
+```bash
+php artisan db:seed --class=WorkspaceSeeder --force
+```
+
+1. **Sessions consolidated to one**: 8am–6pm, replacing the previous three
+   (9am-3pm, 3:30pm-9pm, overnight 10pm-7am). The old session rows are left
+   in the database untouched (deleting them would null out the session on
+   every historical booking that used one) — they're just no longer offered
+   as choices for new bookings.
+2. **"Dedicated Space" renamed to "Dedicated Space (VIP)"** — renamed in
+   place, not recreated, so it doesn't become a duplicate room the way
+   renaming caused problems before.
+3. **VIP room added to the September Promo**, alongside Conference Room,
+   Workspace 1, and Private Space.
+4. **VIP room added to Basic Package** too: ₦3,000/day, ₦18,000/week, ₦50,000/month.
+5. **Promo now has two real duration options** (1 Month and 1 Week) instead
+   of one flat rate, with room-specific pricing:
+   - 1 Month: Conference ₦30k, Workspace 1 / Private Space ₦40k, VIP ₦50k
+   - 1 Week: Conference ₦9k, Workspace 1 / Private Space ₦12k, VIP ₦18k
+     (identical to Basic Package's weekly price for the same room — only
+     the space differs)
+   - **The "free extra time" comes entirely from `promo_fixed_end_date`**
+     (still Oct 31, unchanged) — whether someone books 1 week or 1 month,
+     their access always runs through Oct 31, which is what delivers the
+     "get extra time free" effect without needing separate pricing logic
+     for it.
+6. **Admin's "Book for Customer" form needs no separate changes** — it
+   queries the exact same Plan/Room/PlanDuration/WorkspaceSession data the
+   customer-facing flow uses, so re-running the seeder updates both at once.
+
+## New: Gen Alpha Future Builders Camp
+
+Ported from the legacy procedural site's final pricing model (see the two
+incremental SQL files you sent — the pricing evolved from "choose Basic or
+VIP" to "compulsory ₦15,000 registration + optional ₦250,000 VIP upgrade
+addable any time after"). New migrations for `teen_program_registrations`
+and `teen_program_payments` — `php artisan migrate`.
+
+**Architectural choice worth knowing about:** the legacy version let a
+parent create an account inline while registering a child. This version
+requires signing into the app first (same as booking a workspace) — no
+separate inline signup flow, since every customer already has a normal
+account by the time they'd do this.
+
+**Slot capacity — a judgment call, please confirm.** Your flyer copy says
+"20 slots **per category**" in one spot but "**20 slots** available" (no
+category split) in another — and since VIP is no longer a separate
+registration path (just an optional add-on to one registration), "per
+category" doesn't map cleanly onto the current pricing model. Implemented
+as **one shared pool of 20 slots total** — `TeenProgramController::TOTAL_SLOTS`.
+Change that constant if you actually want a different number, or tell me
+if you want it split some other way.
+
+New endpoints: public `GET /teen-program/slots-remaining`; authenticated
+`GET/POST /teen-program`, `POST /teen-program/{id}/pay`, receipt and
+admission-letter endpoints; admin `GET /admin/teen-program`.
+
+## New: real PDF receipts/letters, matching your procedural design exactly
+
+**One new Composer package required:**
+```bash
+composer require dompdf/dompdf
+```
+
+The receipt and admission letter are now genuine downloadable PDFs, generated
+server-side with Dompdf — ported directly from `teen_receipt.inc.php` and
+`teen_admission_letter.inc.php`, same layout, same colors, same copy, not a
+re-imagined version. New endpoints:
+- `GET /teen-program/{id}/receipt/pdf`
+- `GET /teen-program/{id}/admission-letter/pdf`
+
+`public/images/logo-main.png` is bundled in this package — Dompdf needs the
+logo as a local file (or base64), it can't reliably fetch it the way a
+browser can.
+
+**Frontend:** both pages now show "Download PDF" (works on every device —
+fetches the PDF with the auth token attached, since a plain link click
+can't send that header) and "Print" (hidden on phones/tablets via
+`hidden md:flex` — printing isn't a mobile use case).
+
+## New: Digital Academy Cohort Programme
+
+Built on the migrations that already existed from much earlier (they'd
+never actually been wired up to a controller) — `php artisan migrate` for
+one new migration adding a few missing fields, then
+`php artisan db:seed --class=CohortSeeder --force` to create the program
+and the 5 real 2026 batches from your reference page.
+
+**Pricing, exactly as you described:**
+- Bootcamp/Non-Bootcamp fee (₦60k / ₦40k) — compulsory, one or the other
+- Tuition (₦250,000 base) — **50% off if paid before Oct 1, 2026**, full
+  price from Oct 1 onward
+- **The discount is checked at the moment of payment, not registration** —
+  "register and pay before month end" taken literally. Someone who
+  registers in September but pays in October pays full tuition; someone
+  who registers for a November batch but pays in September still gets the
+  discount. If you actually meant the discount tied to each batch's own
+  start date instead, tell me — it's a one-line change in
+  `CohortController::currentTuitionFee()`.
+- The Oct 1, 2026 cutoff is a named constant (`DISCOUNT_ENDS_AT`) — easy to
+  find and adjust later.
+
+Registration form matches your reference page's fields (programme, course
+track, batch, bootcamp preference, status-conditional state code/matric
+number, education level, laptop ownership, motivation) — minus inline
+account creation, since this app already requires signing in first.
+
+New endpoints: public `GET /cohort`; authenticated
+`GET /cohort/my-enrollment`, `POST /cohort/enroll`, `POST /cohort/{id}/pay`,
+`GET /cohort/{id}/receipt`; admin `GET /admin/cohort`.
+
+**Not yet built for this feature:** a real PDF receipt (currently a
+print-page like the old teen-camp pages before Dompdf) and an admin tab to
+view it (backend endpoint exists, no frontend tab yet — same gap as the
+Feedback tab from earlier).
+
+## Closed out: cohort receipt PDF + admin tab
+
+Same Dompdf treatment as the teen camp receipt/letter — real downloadable
+PDF at `GET /cohort/{id}/receipt/pdf`, using the `PdfService` already built
+for that feature. Admin now has a "Cohort Programme" tab (frontend only —
+the backend endpoint already existed) alongside "Future Builders Camp".
+
+## Root cause of the multi-day cohort "phantom enrollment" bug
+
+**`php artisan route:cache` was running on every single deploy, and Laravel
+cannot reliably cache closure-based routes.** Every one of our debugging
+attempts that used a closure (`Route::get('/x', function () {...})`) instead
+of a controller method got silently broken by the next deploy's route
+cache — while every controller-based route in the rest of the app kept
+working fine the whole time, which is exactly why this looked so
+inexplicable: the bug only ever showed up in the routes we were actively
+using to debug it.
+
+**Fixed two ways:**
+1. `.github/workflows/deploy.yml` now runs `route:clear` instead of
+   `route:cache` on deploy. Routes resolve fresh from `routes/api.php` on
+   every request — a genuinely negligible performance cost at this app's
+   scale, and it makes this entire class of bug structurally impossible
+   going forward, regardless of whether a route happens to use a closure.
+2. The cohort enrollment endpoint is back to a normal, clean controller
+   method (`CohortController::myEnrollment`) — no closures needed as a
+   workaround anymore, since the actual fix is at the deploy level.
+
+If you ever want route caching back for a performance reason at much larger
+scale, every route handler in `routes/api.php` — including `/health` —
+would need to be a controller method first, with zero exceptions.
+
+## Cohort feature rebuilt fresh as "Academy" — old tables dropped
+
+After days of exhaustive diagnosis on `/cohort/*` (route caching turned out
+to be a real, separately-fixed bug, but that specific endpoint stayed
+broken regardless of the fix), the whole feature was rebuilt from scratch
+under entirely new names to guarantee zero overlap with whatever was stuck:
+
+- Tables: `cohort_enrollments`/`cohort_intakes`/`cohort_programs` → dropped
+  (confirmed completely empty throughout — nothing lost) and replaced with
+  `academy_enrollments`/`academy_batches`/`academy_programs`
+- Models: `CohortEnrollment`/`CohortIntake`/`CohortProgram` →
+  `AcademyEnrollment`/`AcademyBatch`/`AcademyProgram`
+- Controller: `CohortController` → `AcademyEnrollmentController`
+- Routes: everything under `/cohort/*` → `/academy/*`
+- Seeder: `CohortSeeder` → `AcademySeeder`
+
+Same business logic throughout (bootcamp/non-bootcamp fee, 50% tuition
+discount checked at payment time, Oct 1 2026 cutoff) — only the names
+changed. `php artisan migrate` handles the table swap in one step.
+
+**New: admin can download/print any customer's receipt directly** —
+`GET /admin/academy/{id}/receipt/pdf`, bypassing the customer-ownership
+check the regular receipt endpoint has, reusing the identical PDF template.
+
 ## Not yet built (next)
 
 - Paystack webhook endpoint (currently relies on the frontend calling `/verify` after redirect).
