@@ -52,6 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::get('/bookings/{booking}/receipt', [BookingController::class, 'receipt']);
+    Route::get('/bookings/{booking}/receipt/pdf', [BookingController::class, 'receiptPdf']);
+    Route::get('/wallet/fundings/{transaction}/receipt/pdf', [WalletController::class, 'fundingReceiptPdf']);
 
     Route::get('/feedback/pending', [FeedbackController::class, 'pending']);
     Route::post('/bookings/{booking}/feedback', [FeedbackController::class, 'store']);
@@ -110,6 +112,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/teen-program', [AdminBookingController::class, 'teenProgramRegistrations']);
     Route::get('/academy', [AdminBookingController::class, 'academyEnrollments']);
     Route::get('/academy/{enrollment}/receipt/pdf', [AdminBookingController::class, 'academyReceiptPdf']);
+    Route::get('/bookings/{booking}/receipt/pdf', [AdminBookingController::class, 'bookingReceiptPdf']);
+    Route::get('/wallet-fundings/{transaction}/receipt/pdf', [AdminBookingController::class, 'walletFundingReceiptPdf']);
 
     Route::get('/push/vapid-public-key', [AdminPushController::class, 'vapidPublicKey']);
     Route::post('/push/subscribe', [AdminPushController::class, 'subscribe']);

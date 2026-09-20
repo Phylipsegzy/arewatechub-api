@@ -383,6 +383,21 @@ class AdminBookingController extends Controller
         return app(\App\Http\Controllers\Api\AcademyEnrollmentController::class)->buildReceiptPdf($enrollment, $pdf);
     }
 
+    /**
+     * Admin can download/print any customer's booking or wallet funding
+     * receipt directly — same PDF the customer themselves would get, no
+     * need for the customer to be logged in or have downloaded it first.
+     */
+    public function bookingReceiptPdf(\App\Models\Booking $booking, \App\Services\PdfService $pdf)
+    {
+        return app(\App\Http\Controllers\Api\BookingController::class)->buildReceiptPdf($booking, $pdf);
+    }
+
+    public function walletFundingReceiptPdf(\App\Models\WalletTransaction $transaction, \App\Services\PdfService $pdf)
+    {
+        return app(\App\Http\Controllers\Api\WalletController::class)->buildFundingReceiptPdf($transaction, $pdf);
+    }
+
     public function overview()
     {
         $today = now()->toDateString();

@@ -191,6 +191,25 @@ class BookingController extends Controller
         );
     }
 
+    public function receiptPdf(Request $request, Booking $booking, \App\Services\PdfService $pdf)
+    {
+        if ($booking->customer_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not your booking'], 403);
+        }
+
+        return $this->buildReceiptPdf($booking, $pdf);
+    }
+
+    public function buildReceiptPdf(Booking $booking, \App\Services\PdfService $pdf)
+    {
+        $booking->load(['customer', 'plan', 'room', 'workspaceSession', 'internetAccess.internetAccount']);
+
+        return $pdf->render('pdf.booking-receipt', [
+            'booking' => $booking,
+            'logoSrc' => $pdf->logoDataUri(),
+        ], "ArewaTecHub_Booking_Receipt_{$booking->id}.pdf");
+    }
+
     protected function sendConfirmationEmail(?Booking $booking): void
     {
         if (! $booking) {

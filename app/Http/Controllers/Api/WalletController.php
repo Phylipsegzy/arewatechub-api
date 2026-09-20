@@ -14,6 +14,28 @@ use Illuminate\Support\Str;
 
 class WalletController extends Controller
 {
+    public function fundingReceiptPdf(Request $request, WalletTransaction $transaction, \App\Services\PdfService $pdf)
+    {
+        if ($transaction->customer_id !== $request->user()->id) {
+            return response()->json(['message' => 'Not your transaction'], 403);
+        }
+        if ($transaction->type !== 'credit' || $transaction->status !== 'successful') {
+            return response()->json(['message' => 'Receipts are only available for successful funding transactions.'], 422);
+        }
+
+        return $this->buildFundingReceiptPdf($transaction, $pdf);
+    }
+
+    public function buildFundingReceiptPdf(WalletTransaction $transaction, \App\Services\PdfService $pdf)
+    {
+        $transaction->load('customer');
+
+        return $pdf->render('pdf.wallet-funding-receipt', [
+            'transaction' => $transaction,
+            'logoSrc' => $pdf->logoDataUri(),
+        ], "ArewaTecHub_Wallet_Receipt_{$transaction->reference}.pdf");
+    }
+
     public function show(Request $request)
     {
         $customer = $request->user();
