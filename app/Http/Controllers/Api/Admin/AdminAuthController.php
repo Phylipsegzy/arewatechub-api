@@ -35,4 +35,26 @@ class AdminAuthController extends Controller
 
         return response()->json(['message' => 'Logged out']);
     }
+
+    /**
+     * Any authenticated staff member (admin or cashier) can change their
+     * own password — no email-reset flow needed for internal accounts.
+     */
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $admin = $request->user();
+
+        if (! Hash::check($request->current_password, $admin->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 422);
+        }
+
+        $admin->update(['password' => $request->new_password]);
+
+        return response()->json(['message' => 'Password updated.']);
+    }
 }

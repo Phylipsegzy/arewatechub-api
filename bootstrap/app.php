@@ -14,7 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'admin.full' => \App\Http\Middleware\EnsureFullAdmin::class,
         ]);
+        $middleware->append(\App\Http\Middleware\PreventCaching::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

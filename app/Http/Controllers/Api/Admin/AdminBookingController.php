@@ -436,6 +436,24 @@ class AdminBookingController extends Controller
         return response()->json($pending);
     }
 
+    /**
+     * Every past funding — not just pending manual transfers — across all
+     * sources (Paystack popup, dedicated account, approved bank transfer).
+     * Pending manual transfers disappear from the "pending" list the
+     * instant they're approved, so this is the only place to see them
+     * again afterward, and the only place a receipt download is actually
+     * reachable for them.
+     */
+    public function walletFundingHistory(Request $request)
+    {
+        $history = WalletTransaction::with('customer:id,firstname,lastname,email')
+            ->where('type', 'credit')
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($history);
+    }
+
     public function approveWalletFunding(Request $request, WalletTransaction $walletTransaction)
     {
         if ($walletTransaction->status !== 'pending') {

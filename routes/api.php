@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\AdminBookingController;
+use App\Http\Controllers\Api\Admin\AdminCashierController;
 use App\Http\Controllers\Api\Admin\AdminInternetAccountController;
 use App\Http\Controllers\Api\Admin\AdminPushController;
 use App\Http\Controllers\Api\AuthController;
@@ -78,16 +79,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/academy/status', [AcademyEnrollmentController::class, 'status']);
 });
 
-// --- Admin ---
+// --- Admin & Cashier (shared login) ---
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
 
+// Reachable by BOTH admin and cashier accounts — anything a cashier is
+// explicitly allowed to do (book for a customer, view bookings, accept
+// manual wallet fundings), plus basic account actions every staff member
+// needs regardless of role.
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     Route::get('/me', [AdminAuthController::class, 'me']);
     Route::post('/logout', [AdminAuthController::class, 'logout']);
+    Route::post('/password/update', [AdminAuthController::class, 'updatePassword']);
 
     Route::get('/bookings', [AdminBookingController::class, 'bookings']);
-    Route::patch('/bookings/{booking}/status', [AdminBookingController::class, 'updateBookingStatus']);
-    Route::patch('/bookings/{booking}/reschedule', [AdminBookingController::class, 'rescheduleBooking']);
     Route::post('/bookings/create-for-customer', [AdminBookingController::class, 'bookForCustomer']);
 
     Route::get('/workspace/plans', [AdminBookingController::class, 'workspaceOptions']);
@@ -95,14 +99,25 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/workspace/plans/{plan}/durations', [AdminBookingController::class, 'workspaceDurations']);
     Route::get('/workspace/availability', [AdminBookingController::class, 'workspaceAvailability']);
 
+    // Search only — needed to find a customer to book for. The broader
+    // "Customers" management tab (and wallet adjustment specifically) is
+    // full-admin-only, below.
     Route::get('/customers', [AdminBookingController::class, 'customers']);
+
+    Route::get('/wallet-fundings/pending', [AdminBookingController::class, 'pendingWalletFundings']);
+    Route::get('/wallet-fundings/history', [AdminBookingController::class, 'walletFundingHistory']);
+    Route::post('/wallet-fundings/{walletTransaction}/approve', [AdminBookingController::class, 'approveWalletFunding']);
+    Route::post('/wallet-fundings/{walletTransaction}/reject', [AdminBookingController::class, 'rejectWalletFunding']);
+});
+
+// Full admin only — cashiers get a 403 from EnsureFullAdmin on all of these.
+Route::middleware(['auth:sanctum', 'admin.full'])->prefix('admin')->group(function () {
+    Route::patch('/bookings/{booking}/status', [AdminBookingController::class, 'updateBookingStatus']);
+    Route::patch('/bookings/{booking}/reschedule', [AdminBookingController::class, 'rescheduleBooking']);
+
     Route::post('/customers/{customer}/wallet/adjust', [AdminBookingController::class, 'adjustWallet']);
 
     Route::get('/overview', [AdminBookingController::class, 'overview']);
-
-    Route::get('/wallet-fundings/pending', [AdminBookingController::class, 'pendingWalletFundings']);
-    Route::post('/wallet-fundings/{walletTransaction}/approve', [AdminBookingController::class, 'approveWalletFunding']);
-    Route::post('/wallet-fundings/{walletTransaction}/reject', [AdminBookingController::class, 'rejectWalletFunding']);
 
     Route::get('/internet-accounts', [AdminInternetAccountController::class, 'index']);
     Route::post('/internet-accounts', [AdminInternetAccountController::class, 'store']);
@@ -118,4 +133,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/push/vapid-public-key', [AdminPushController::class, 'vapidPublicKey']);
     Route::post('/push/subscribe', [AdminPushController::class, 'subscribe']);
     Route::post('/push/unsubscribe', [AdminPushController::class, 'unsubscribe']);
+
+    // Cashier accounts can ONLY be created/managed here, by a full admin —
+    // no self-registration path exists for staff accounts.
+    Route::get('/cashiers', [AdminCashierController::class, 'index']);
+    Route::post('/cashiers', [AdminCashierController::class, 'store']);
+    Route::delete('/cashiers/{cashier}', [AdminCashierController::class, 'destroy']);
 });
